@@ -1,21 +1,22 @@
-import os
-import gradio as gr
+import streamlit as st
 from groq import Groq
 
-# Get Groq API key from environment variable
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+st.set_page_config(
+    page_title="My AI Study Chatbot",
+    page_icon="🤖"
+)
 
-if not GROQ_API_KEY:
-    raise ValueError("GROQ_API_KEY is not set.")
+st.title("🤖 My AI Study Chatbot")
+st.write("Ask me anything about Java, Python, C, ECE and engineering!")
 
-# Create Groq client
-client = Groq(api_key=GROQ_API_KEY)
+# Get Groq API key from Streamlit Secrets
+api_key = st.secrets["GROQ_API_KEY"]
 
+client = Groq(api_key=api_key)
 
-# Chat function
-def chat(message, history):
-
-    messages = [
+# Store chat history
+if "messages" not in st.session_state:
+    st.session_state.messages = [
         {
             "role": "system",
             "content": (
@@ -26,33 +27,37 @@ def chat(message, history):
         }
     ]
 
-    # Add previous conversation
-    if history:
-        messages.extend(history)
+# Display previous messages
+for message in st.session_state.messages:
+    if message["role"] != "system":
+        with st.chat_message(message["role"]):
+            st.write(message["content"])
 
-    # Add current user message
-    messages.append({
+# Chat input
+if prompt := st.chat_input("Ask your question..."):
+
+    st.session_state.messages.append({
         "role": "user",
-        "content": message
+        "content": prompt
     })
 
-    # Call Groq
+    with st.chat_message("user"):
+        st.write(prompt)
+
+    # Get response from Groq
     response = client.chat.completions.create(
         model="openai/gpt-oss-20b",
-        messages=messages
+        messages=st.session_state.messages
     )
 
-    return response.choices[0].message.content
+    answer = response.choices[0].message.content
+
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": answer
+    })
+
+    with st.chat_message("assistant"):
+        st.write(answer)
 
 
-# Create Gradio chatbot
-demo = gr.ChatInterface(
-    fn=chat,
-    type="messages",
-    title="🤖 My AI Study Chatbot",
-    description="Ask me anything about Java, Python, C, ECE and engineering!"
-)
-
-
-# Launch application
-demo.launch()
